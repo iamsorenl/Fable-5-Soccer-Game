@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Arcade Soccer</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="stage">
+    <canvas id="game"></canvas>
+
+    <div id="hud" class="hidden">
+      <span id="hud-team0" class="hud-team hud-team0">BLUE</span>
+      <span id="hud-score">0 – 0</span>
+      <span id="hud-team1" class="hud-team hud-team1">RED</span>
+      <span id="hud-clock">0:00</span>
+      <span id="hud-half">1st Half</span>
+      <button id="btn-pause" class="btn" title="Pause (Esc)">&#10074;&#10074;</button>
+    </div>
+
+    <div id="menu">
+      <h1 class="title">Arcade Soccer</h1>
+
+      <div class="menu-section">
+        <div class="difficulty-row" id="difficulty">
+          <span class="difficulty-label">Difficulty</span>
+          <button class="btn btn-diff" data-difficulty="easy">Easy</button>
+          <button class="btn btn-diff selected" data-difficulty="normal">Normal</button>
+          <button class="btn btn-diff" data-difficulty="hard">Hard</button>
+        </div>
+        <div class="difficulty-row" id="switchmode">
+          <span class="difficulty-label">Player Switch</span>
+          <button class="btn btn-switch selected" data-switch="auto">Auto (nearest)</button>
+          <button class="btn btn-switch" data-switch="stay">Stay</button>
+        </div>
+        <button id="btn-1p" class="btn btn-primary">1 Player</button>
+        <button id="btn-2p" class="btn btn-primary">2 Players</button>
+      </div>
+
+      <div class="controls-legend">
+        <div class="legend-col">
+          <h2 class="legend-title legend-p1">Player 1 (Blue)</h2>
+          <ul>
+            <li><span class="key">W A S D</span> Move</li>
+            <li><span class="key">C</span> Pass</li>
+            <li><span class="key">V</span> Shoot (hold to charge)</li>
+            <li><span class="key">Q</span> Swap to/from goalie</li>
+          </ul>
+        </div>
+        <div class="legend-col">
+          <h2 class="legend-title legend-p2">Player 2 (Red)</h2>
+          <ul>
+            <li><span class="key">&uarr; &larr; &darr; &rarr;</span> Move</li>
+            <li><span class="key">,</span> Pass</li>
+            <li><span class="key">.</span> Shoot (hold to charge)</li>
+            <li><span class="key">/</span> Swap to/from goalie</li>
+          </ul>
+        </div>
+      </div>
+      <p class="legend-pause"><span class="key">Esc</span> Pause</p>
+    </div>
+
+    <div id="banner" class="hidden">
+      <div id="banner-text">GOAL!</div>
+      <button id="btn-again" class="btn btn-primary hidden">Play Again</button>
+    </div>
+  </div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
