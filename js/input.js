@@ -18,7 +18,10 @@ const PREVENT_DEFAULT = new Set([
   'Slash', // Firefox quick-find
 ]);
 
-export function createInput(target = window) {
+// mouseTarget (usually the game canvas) scopes button presses so clicks on
+// HUD/menu elements never register as game input; movement and release are
+// tracked window-wide so drags ending off-canvas still count.
+export function createInput(target = window, mouseTarget = null) {
   const held = new Set();
 
   // Edge-trigger flags, cleared by endTick().
@@ -29,6 +32,44 @@ export function createInput(target = window) {
     switch: [false, false],
     pause: false,
   };
+
+  const mouse = {
+    x: 0,
+    y: 0,
+    lmbHeld: false,
+    downEdge: false,
+    releaseEdge: false,
+    rmbEdge: false,
+  };
+
+  function onMouseMove(e) {
+    mouse.x = e.clientX;
+    mouse.y = e.clientY;
+  }
+
+  function onMouseDown(e) {
+    mouse.x = e.clientX; // buttons carry coordinates too — never act on stale ones
+    mouse.y = e.clientY;
+    if (e.button === 0) {
+      mouse.lmbHeld = true;
+      mouse.downEdge = true;
+    } else if (e.button === 2) {
+      mouse.rmbEdge = true;
+    }
+  }
+
+  function onMouseUp(e) {
+    mouse.x = e.clientX;
+    mouse.y = e.clientY;
+    if (e.button === 0) {
+      if (mouse.lmbHeld) mouse.releaseEdge = true;
+      mouse.lmbHeld = false;
+    }
+  }
+
+  function onContextMenu(e) {
+    e.preventDefault(); // right-click is "pass" on the pitch
+  }
 
   function onKeyDown(e) {
     if (PREVENT_DEFAULT.has(e.code)) e.preventDefault();
@@ -56,11 +97,18 @@ export function createInput(target = window) {
   // Clear all held keys on blur so players don't run forever after tab-switch.
   function onBlur() {
     held.clear();
+    mouse.lmbHeld = false;
   }
 
   target.addEventListener('keydown', onKeyDown);
   target.addEventListener('keyup', onKeyUp);
   target.addEventListener('blur', onBlur);
+  if (mouseTarget) {
+    target.addEventListener('mousemove', onMouseMove);
+    target.addEventListener('mouseup', onMouseUp);
+    mouseTarget.addEventListener('mousedown', onMouseDown);
+    mouseTarget.addEventListener('contextmenu', onContextMenu);
+  }
 
   return {
     getMove(slot) {
@@ -99,12 +147,28 @@ export function createInput(target = window) {
       return edges.pause;
     },
 
+    // Mouse state in client (CSS pixel) coordinates; caller converts to
+    // pitch coordinates via the renderer.
+    getMouse() {
+      return {
+        x: mouse.x,
+        y: mouse.y,
+        held: mouse.lmbHeld,
+        downPressed: mouse.downEdge,
+        released: mouse.releaseEdge,
+        passPressed: mouse.rmbEdge,
+      };
+    },
+
     endTick() {
       edges.pass[0] = edges.pass[1] = false;
       edges.shootReleased[0] = edges.shootReleased[1] = false;
       edges.goalie[0] = edges.goalie[1] = false;
       edges.switch[0] = edges.switch[1] = false;
       edges.pause = false;
+      mouse.downEdge = false;
+      mouse.releaseEdge = false;
+      mouse.rmbEdge = false;
     },
 
     // Detach listeners (useful for tests / teardown).
@@ -112,6 +176,12 @@ export function createInput(target = window) {
       target.removeEventListener('keydown', onKeyDown);
       target.removeEventListener('keyup', onKeyUp);
       target.removeEventListener('blur', onBlur);
+      if (mouseTarget) {
+        target.removeEventListener('mousemove', onMouseMove);
+        target.removeEventListener('mouseup', onMouseUp);
+        mouseTarget.removeEventListener('mousedown', onMouseDown);
+        mouseTarget.removeEventListener('contextmenu', onContextMenu);
+      }
     },
   };
 }

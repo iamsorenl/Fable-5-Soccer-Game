@@ -106,26 +106,35 @@ export function doPass(state, playerIdx, dirX, dirY, error = 0) {
   return true;
 }
 
-export function doShoot(state, playerIdx, chargeS, error = 0) {
+// aimX/aimY: explicit target (e.g. mouse cursor) — shot goes exactly there,
+// with no movement bend. Omitted: auto-aim at the corner away from the keeper.
+export function doShoot(state, playerIdx, chargeS, error = 0, aimX = null, aimY = null) {
   if (!canKick(state, playerIdx)) return;
   const p = state.players[playerIdx];
-  const gx = goalCenterX(state, playerIdx);
-  // Aim for the corner away from the keeper — dead center is where they stand.
-  const keeper = state.players[(1 - p.team) * 4];
-  const mouthTop = (CONFIG.PITCH_H - CONFIG.GOAL_W) / 2;
-  const inset = CONFIG.BALL_RADIUS * 2 + 14;
-  const gy = keeper.y >= CONFIG.PITCH_H / 2
-    ? mouthTop + inset
-    : mouthTop + CONFIG.GOAL_W - inset;
 
-  let aim = normalize(gx - state.ball.x, gy - state.ball.y);
-  if (aim.len === 0) aim = { x: state.attackDir[p.team], y: 0 };
+  let aim;
+  if (aimX !== null && aimY !== null) {
+    aim = normalize(aimX - state.ball.x, aimY - state.ball.y);
+    if (aim.len === 0) aim = { x: state.attackDir[p.team], y: 0 };
+  } else {
+    const gx = goalCenterX(state, playerIdx);
+    // Aim for the corner away from the keeper — dead center is where they stand.
+    const keeper = state.players[(1 - p.team) * 4];
+    const mouthTop = (CONFIG.PITCH_H - CONFIG.GOAL_W) / 2;
+    const inset = CONFIG.BALL_RADIUS * 2 + 14;
+    const gy = keeper.y >= CONFIG.PITCH_H / 2
+      ? mouthTop + inset
+      : mouthTop + CONFIG.GOAL_W - inset;
 
-  // Movement bends the aim: lateral velocity relative to the shot direction.
-  const speed = Math.hypot(p.vx, p.vy);
-  if (speed > 1) {
-    const lateral = (p.vx * -aim.y + p.vy * aim.x) / CONFIG.PLAYER_SPEED;
-    aim = rotate(aim.x, aim.y, lateral * CONFIG.SHOT_BEND);
+    aim = normalize(gx - state.ball.x, gy - state.ball.y);
+    if (aim.len === 0) aim = { x: state.attackDir[p.team], y: 0 };
+
+    // Movement bends the aim: lateral velocity relative to the shot direction.
+    const speed = Math.hypot(p.vx, p.vy);
+    if (speed > 1) {
+      const lateral = (p.vx * -aim.y + p.vy * aim.x) / CONFIG.PLAYER_SPEED;
+      aim = rotate(aim.x, aim.y, lateral * CONFIG.SHOT_BEND);
+    }
   }
   if (error > 0) {
     aim = rotate(aim.x, aim.y, (Math.random() * 2 - 1) * error);

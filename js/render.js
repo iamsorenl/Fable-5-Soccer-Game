@@ -154,6 +154,48 @@ export function createRenderer(canvas) {
     ctx.stroke();
   }
 
+  // Convert a client (CSS pixel) point to logical pitch coordinates,
+  // inverting the render transform (scale + goal-depth x offset).
+  function toLogical(clientX, clientY) {
+    const rect = canvas.getBoundingClientRect();
+    const px = (clientX - rect.left) * (canvas.width / rect.width);
+    const py = (clientY - rect.top) * (canvas.height / rect.height);
+    return { x: px / scale - CONFIG.GOAL_DEPTH, y: py / scale };
+  }
+
+  // Ground arrow from the ball toward the aim point; brightens with charge.
+  function drawAimArrow(arrow) {
+    const dx = arrow.tx - arrow.x;
+    const dy = arrow.ty - arrow.y;
+    const d = Math.hypot(dx, dy);
+    if (d < 24) return;
+    const ux = dx / d;
+    const uy = dy / d;
+    const len = Math.min(d, 170);
+    const x0 = arrow.x + ux * 18;
+    const y0 = arrow.y + uy * 18;
+    const x1 = arrow.x + ux * len;
+    const y1 = arrow.y + uy * len;
+
+    const alpha = 0.35 + 0.5 * (arrow.charge || 0);
+    ctx.strokeStyle = `rgba(255, 235, 120, ${alpha})`;
+    ctx.lineWidth = 4;
+    ctx.setLineDash([10, 8]);
+    ctx.beginPath();
+    ctx.moveTo(x0, y0);
+    ctx.lineTo(x1, y1);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.fillStyle = `rgba(255, 235, 120, ${alpha})`;
+    ctx.beginPath();
+    ctx.moveTo(x1 + ux * 12, y1 + uy * 12);
+    ctx.lineTo(x1 - uy * 7, y1 + ux * 7);
+    ctx.lineTo(x1 + uy * 7, y1 - ux * 7);
+    ctx.closePath();
+    ctx.fill();
+  }
+
   function drawBall(ball) {
     const C = CONFIG.COLORS;
     ctx.beginPath();
@@ -189,6 +231,8 @@ export function createRenderer(canvas) {
     ctx.clearRect(-CONFIG.GOAL_DEPTH, 0, DRAW_W, DRAW_H);
     drawPitch();
 
+    if (state.aimArrow) drawAimArrow(state.aimArrow);
+
     for (let i = 0; i < state.players.length; i++) {
       const p = state.players[i];
       const isControlled = state.controlled[p.team] === i;
@@ -210,5 +254,5 @@ export function createRenderer(canvas) {
     facing.clear();
   }
 
-  return { render, resize, reset };
+  return { render, resize, reset, toLogical };
 }

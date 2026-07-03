@@ -35,6 +35,21 @@
           <button class="btn btn-switch selected" data-switch="auto">Auto (nearest)</button>
           <button class="btn btn-switch" data-switch="stay">Stay</button>
         </div>
+        <div class="difficulty-row" id="controlsmode">
+          <span class="difficulty-label">P1 Controls</span>
+          <button class="btn btn-controls selected" data-controls="keys">Keys</button>
+          <button class="btn btn-controls" data-controls="mouse">Mouse</button>
+        </div>
+        <div class="difficulty-row" id="goaliemode">
+          <span class="difficulty-label">Goalie</span>
+          <button class="btn btn-goalie selected" data-goalie="swap">Swappable</button>
+          <button class="btn btn-goalie" data-goalie="ai">Always AI</button>
+        </div>
+        <div class="difficulty-row" id="aimarrow">
+          <span class="difficulty-label">Aim Arrow</span>
+          <button class="btn btn-arrow selected" data-arrow="on">On</button>
+          <button class="btn btn-arrow" data-arrow="off">Off</button>
+        </div>
         <button id="btn-1p" class="btn btn-primary">1 Player</button>
         <button id="btn-2p" class="btn btn-primary">2 Players</button>
       </div>
@@ -42,11 +57,17 @@
       <div class="controls-legend" id="controls-legend">
         <div class="legend-col">
           <h2 class="legend-title legend-p1">Player 1 (Blue)</h2>
-          <ul>
+          <ul id="legend-p1-keys">
             <li><span class="key">W A S D</span> Move</li>
             <li><span class="key">C</span> Pass / swap player</li>
             <li><span class="key">V</span> Shoot (hold to charge)</li>
             <li><span class="key">Q</span> Swap to/from goalie</li>
+          </ul>
+          <ul id="legend-p1-mouse" class="hidden">
+            <li><span class="key">Mouse</span> Move (player follows)</li>
+            <li><span class="key">LMB</span> Shoot (hold to charge)</li>
+            <li><span class="key">RMB</span> Pass toward cursor</li>
+            <li><span class="key">Click</span> Teammate to swap</li>
           </ul>
         </div>
         <div class="legend-col">

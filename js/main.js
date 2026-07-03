@@ -24,18 +24,27 @@ const dom = {
   btnPause: $('btn-pause'),
   difficulty: $('difficulty'),
   switchmode: $('switchmode'),
+  controlsmode: $('controlsmode'),
+  goaliemode: $('goaliemode'),
+  aimarrow: $('aimarrow'),
   legend: $('controls-legend'),
   legendPause: $('legend-pause'),
+  legendP1Keys: $('legend-p1-keys'),
+  legendP1Mouse: $('legend-p1-mouse'),
 };
 
-const input = createInput(window);
+const input = createInput(window, $('game'));
 const renderer = createRenderer($('game'));
 
 let state = null;
 let paused = false;
 let selectedDifficulty = 'normal';
 let selectedSwitchMode = 'auto'; // 'auto' = nearest-to-ball | 'stay' = follow possession only
+let selectedControls = 'keys';   // P1: 'keys' | 'mouse'
+let selectedGoalie = 'swap';     // 'swap' = goalie key/click works | 'ai' = keeper always AI
+let selectedAimArrow = 'on';     // aim arrow in mouse mode
 let pendingKickoffTeam = 0; // conceding team, restarts play after a goal
+let mouseSwapConsumed = false; // this LMB press was a teammate swap, not a shot
 
 // ---------- Menu wiring ----------
 
@@ -58,6 +67,30 @@ for (const btn of dom.switchmode.querySelectorAll('.btn-switch')) {
     selectedSwitchMode = btn.dataset.switch;
   });
 }
+
+function wireToggleRow(container, btnSelector, onPick) {
+  for (const btn of container.querySelectorAll(btnSelector)) {
+    btn.addEventListener('click', () => {
+      for (const b of container.querySelectorAll(btnSelector)) {
+        b.classList.remove('selected');
+      }
+      btn.classList.add('selected');
+      onPick(btn);
+    });
+  }
+}
+
+wireToggleRow(dom.controlsmode, '.btn-controls', (btn) => {
+  selectedControls = btn.dataset.controls;
+  dom.legendP1Keys.classList.toggle('hidden', selectedControls === 'mouse');
+  dom.legendP1Mouse.classList.toggle('hidden', selectedControls !== 'mouse');
+});
+wireToggleRow(dom.goaliemode, '.btn-goalie', (btn) => {
+  selectedGoalie = btn.dataset.goalie;
+});
+wireToggleRow(dom.aimarrow, '.btn-arrow', (btn) => {
+  selectedAimArrow = btn.dataset.arrow;
+});
 
 function togglePause() {
   if (state && state.phase !== 'fulltime') paused = !paused;
@@ -82,6 +115,10 @@ dom.btnAgain.addEventListener('click', () => {
 function startMatch(mode) {
   state = createMatchState({ mode, difficulty: selectedDifficulty });
   state.switchMode = selectedSwitchMode;
+  state.controlsMode = selectedControls;
+  state.goalieMode = selectedGoalie;
+  state.aimArrowOn = selectedAimArrow === 'on';
+  mouseSwapConsumed = false;
   switchCycle[0].list = switchCycle[1].list = null;
   switchCycle[0].age = switchCycle[1].age = Infinity;
   stayCarrier[0] = stayCarrier[1] = null;
@@ -154,9 +191,10 @@ function resolveControlled(team, dt) {
 
   switchCycle[team].age += dt;
 
-  // Goalie key toggles keeper control on/off at any time.
+  // Goalie key toggles keeper control on/off at any time (unless the menu
+  // says the keeper is always AI).
   const keeperIdx = team * 4;
-  if (input.goaliePressed(team)) {
+  if (input.goaliePressed(team) && state.goalieMode !== 'ai') {
     switchControlTo(team, idx === keeperIdx ? nearestOutfielder(team) : keeperIdx);
     return;
   }
@@ -200,7 +238,74 @@ function resolveControlled(team, dt) {
   }
 }
 
+// P1 mouse scheme: follow the cursor; LMB hold-charge then release shoots at
+// the cursor; RMB passes toward it; LMB down on a teammate swaps to them.
+function applyMouseInput(team, dt) {
+  const idx = state.controlled[team];
+  if (idx === null || idx === undefined) return;
+  const p = state.players[idx];
+  const m = input.getMouse();
+  const cur = renderer.toLogical(m.x, m.y);
+
+  // Follow the cursor with arrival slow-down and a deadzone (no orbiting).
+  const dx = cur.x - p.x;
+  const dy = cur.y - p.y;
+  const d = Math.hypot(dx, dy);
+  if (d > 8) {
+    const sp = CONFIG.PLAYER_SPEED * Math.min(1, (d - 8) / 40);
+    p.vx = (dx / d) * sp;
+    p.vy = (dy / d) * sp;
+  } else {
+    p.vx = 0;
+    p.vy = 0;
+  }
+
+  // LMB down on a teammate = swap; that press can never become a shot.
+  if (m.downPressed) {
+    mouseSwapConsumed = false;
+    for (let i = team * 4; i < team * 4 + 4; i++) {
+      if (i === idx) continue;
+      const mate = state.players[i];
+      if (state.goalieMode === 'ai' && mate.isKeeper) continue;
+      if (Math.hypot(cur.x - mate.x, cur.y - mate.y) <= mate.r + 8) {
+        switchControlTo(team, i);
+        switchCycle[team].age = 0; // manual pick gets the same grace window
+        mouseSwapConsumed = true;
+        return;
+      }
+    }
+  }
+
+  if (m.passPressed) {
+    doPass(state, idx, dx, dy);
+  }
+
+  if (m.held && !mouseSwapConsumed) {
+    state.charge[team] = Math.min(state.charge[team] + dt, CONFIG.SHOT_CHARGE_MAX_S);
+  } else if (m.released) {
+    if (!mouseSwapConsumed) doShoot(state, idx, state.charge[team], 0, cur.x, cur.y);
+    state.charge[team] = 0;
+    mouseSwapConsumed = false;
+  } else {
+    state.charge[team] = 0;
+  }
+
+  if (state.aimArrowOn && canKick(state, idx)) {
+    state.aimArrow = {
+      x: p.x,
+      y: p.y,
+      tx: cur.x,
+      ty: cur.y,
+      charge: state.charge[team] / CONFIG.SHOT_CHARGE_MAX_S,
+    };
+  }
+}
+
 function applyHumanInput(team, dt) {
+  if (team === 0 && state.controlsMode === 'mouse') {
+    applyMouseInput(team, dt);
+    return;
+  }
   const idx = state.controlled[team];
   if (idx === null || idx === undefined) return;
   const p = state.players[idx];
@@ -246,6 +351,8 @@ function tick(dt) {
     input.endTick();
     return;
   }
+
+  state.aimArrow = null; // re-set each tick by mouse input while playing
 
   switch (state.phase) {
     case 'kickoff': {
