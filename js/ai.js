@@ -53,6 +53,7 @@ function brainOf(state) {
       reactT: [0, 0],                // time spent noticing a possession change
       cooldown: new Array(8).fill(0),
       keeperHold: new Array(8).fill(0),
+      keeperTy: new Array(8).fill(null), // lagged keeper tracking target
     };
   }
   return state._ai;
@@ -181,13 +182,17 @@ function updateKeeper(state, idx, diff, brain, dt) {
     return;
   }
 
-  // Track the ball's y along the line, with slight anticipation.
-  const ty = clamp(
+  // Track the ball's y along the line, with slight anticipation but a
+  // difficulty-scaled reaction lag so keepers are beatable in the corners.
+  const idealY = clamp(
     ball.y + ball.vy * 0.12,
     goalTop + p.r,
     goalBot - p.r
   );
-  seek(p, lineX, ty, speed);
+  const lag = Math.max(diff.keeperLagS || 0.2, dt);
+  if (brain.keeperTy[idx] == null) brain.keeperTy[idx] = idealY;
+  brain.keeperTy[idx] += (idealY - brain.keeperTy[idx]) * Math.min(1, dt / lag);
+  seek(p, lineX, brain.keeperTy[idx], speed);
 }
 
 function updateCarrier(state, idx, diff, brain, dt) {
@@ -329,13 +334,25 @@ function updateTeam(state, team, brain, dt) {
         dist(state.players[humanIdx].x, state.players[humanIdx].y, state.ball.x, state.ball.y) <
           dist(pp.x, pp.y, state.ball.x, state.ball.y);
       if (!humanCloser) {
-        // Press the ball, leading it slightly.
-        seek(
-          pp,
-          state.ball.x + state.ball.vx * 0.15,
-          state.ball.y + state.ball.vy * 0.15,
-          speed
-        );
+        // Press the ball, leading it slightly. On easier settings, hold a
+        // standoff goal-side of a carried ball instead of diving straight in.
+        let tx = state.ball.x + state.ball.vx * 0.15;
+        let ty = state.ball.y + state.ball.vy * 0.15;
+        if (
+          diff.pressStandoff > 0 &&
+          carIdx >= 0 &&
+          state.players[carIdx].team !== team
+        ) {
+          const own = goalCenter(state, team, true);
+          const dx = own.x - tx;
+          const dy = own.y - ty;
+          const dd = Math.hypot(dx, dy);
+          if (dd > 1e-6) {
+            tx += (dx / dd) * diff.pressStandoff;
+            ty += (dy / dd) * diff.pressStandoff;
+          }
+        }
+        seek(pp, tx, ty, speed);
         assigned.add(presser);
         // If the presser reaches the ball, it may hoof it forward.
         if (canKick(state, presser) && brain.cooldown[presser] <= 0) {

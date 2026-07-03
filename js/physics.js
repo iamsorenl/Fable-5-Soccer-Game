@@ -109,12 +109,15 @@ function stepBall(state, dt) {
 function ballPlayerContact(state) {
   const ball = state.ball;
   let nearest = null;
+  let nearestIdx = -1;
   let nearestDist = Infinity;
-  for (const p of state.players) {
-    const d = Math.hypot(ball.x - p.x, ball.y - p.y);
+  for (let i = 0; i < state.players.length; i++) {
+    const q = state.players[i];
+    const d = Math.hypot(ball.x - q.x, ball.y - q.y);
     if (d < nearestDist) {
       nearestDist = d;
-      nearest = p;
+      nearest = q;
+      nearestIdx = i;
     }
   }
   if (!nearest) return;
@@ -125,13 +128,15 @@ function ballPlayerContact(state) {
   // A freshly kicked ball outruns capture so shots/passes escape the kicker.
   const captureMax = pSpeed * CONFIG.DRIBBLE_PUSH + 150;
 
-  // Contested ball — an opponent is also in touching range. Skip the spring
-  // capture (which re-aims ball velocity outright each tick and ping-pongs
-  // the ball between the two nearest players) and let hard collisions decide.
+  // Contested ball — only a genuine 50/50 (an opponent about as close to the
+  // ball as the toucher) breaks the dribble grip; that prevents two-player
+  // velocity ping-pong without letting mere pressure pop the ball loose. A
+  // clearly-second defender has to win the ball by touching it.
   let contested = false;
   for (const q of state.players) {
     if (q.team === p.team) continue;
-    if (Math.hypot(ball.x - q.x, ball.y - q.y) < CONFIG.DRIBBLE_RANGE) {
+    const dq = Math.hypot(ball.x - q.x, ball.y - q.y);
+    if (dq < CONFIG.DRIBBLE_RANGE && dq < nearestDist + 8) {
       contested = true;
       break;
     }
@@ -148,7 +153,9 @@ function ballPlayerContact(state) {
     const dirY = p.vy / pSpeed;
     const tx = p.x + dirX * CONFIG.DRIBBLE_LEAD;
     const ty = p.y + dirY * CONFIG.DRIBBLE_LEAD;
-    const gain = 6; // spring toward the lead point, stable at 60 Hz
+    // Human-controlled players get a tighter tether so the ball stays at
+    // their feet through turns; both values are stable at 60 Hz.
+    const gain = state.controlled[p.team] === nearestIdx ? 9 : 6;
     ball.vx = dirX * pSpeed * CONFIG.DRIBBLE_PUSH + (tx - ball.x) * gain;
     ball.vy = dirY * pSpeed * CONFIG.DRIBBLE_PUSH + (ty - ball.y) * gain;
     state.lastTouchTeam = p.team;

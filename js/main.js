@@ -3,7 +3,7 @@
 import { CONFIG } from './config.js';
 import { createMatchState, setupKickoff, applyHalftime } from './entities.js';
 import { stepPhysics } from './physics.js';
-import { doPass, doShoot } from './actions.js';
+import { canKick, doPass, doShoot } from './actions.js';
 import { updateAI } from './ai.js';
 import { createInput } from './input.js';
 import { createRenderer } from './render.js';
@@ -126,6 +126,26 @@ function switchControlTo(team, idx) {
   state.charge[team] = 0;
 }
 
+// Nearest teammate first; quick re-presses cycle through a snapshot of that
+// order so every teammate is reachable.
+function manualSwitch(team) {
+  const idx = state.controlled[team];
+  const cyc = switchCycle[team];
+  if (!cyc.list || cyc.age > SWITCH_CYCLE_WINDOW_S) {
+    cyc.list = outfieldersByBallDistance(team);
+    cyc.pos = -1;
+  }
+  for (let step = 1; step <= cyc.list.length; step++) {
+    const cand = cyc.list[(cyc.pos + step) % cyc.list.length];
+    if (cand !== idx) {
+      cyc.pos = cyc.list.indexOf(cand);
+      switchControlTo(team, cand);
+      break;
+    }
+  }
+  cyc.age = 0;
+}
+
 function resolveControlled(team, dt) {
   const idx = state.controlled[team];
   if (idx === null || idx === undefined) return;
@@ -141,20 +161,7 @@ function resolveControlled(team, dt) {
 
   // Manual switch key (both modes, works from the keeper too).
   if (input.switchPressed(team)) {
-    const cyc = switchCycle[team];
-    if (!cyc.list || cyc.age > SWITCH_CYCLE_WINDOW_S) {
-      cyc.list = outfieldersByBallDistance(team);
-      cyc.pos = -1;
-    }
-    for (let step = 1; step <= cyc.list.length; step++) {
-      const cand = cyc.list[(cyc.pos + step) % cyc.list.length];
-      if (cand !== idx) {
-        cyc.pos = cyc.list.indexOf(cand);
-        switchControlTo(team, cand);
-        break;
-      }
-    }
-    cyc.age = 0;
+    manualSwitch(team);
     return;
   }
 
@@ -199,8 +206,15 @@ function applyHumanInput(team, dt) {
   p.vx = mv.x * CONFIG.PLAYER_SPEED;
   p.vy = mv.y * CONFIG.PLAYER_SPEED;
 
+  // Pass button doubles as switch: with the ball it passes, without it it
+  // selects the nearest teammate (re-press cycles).
   if (input.passPressed(team)) {
-    doPass(state, idx, mv.x, mv.y);
+    if (canKick(state, idx)) {
+      doPass(state, idx, mv.x, mv.y);
+    } else {
+      manualSwitch(team);
+      return;
+    }
   }
   if (input.shootHeld(team)) {
     state.charge[team] = Math.min(

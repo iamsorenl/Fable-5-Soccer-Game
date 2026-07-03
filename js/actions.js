@@ -110,7 +110,13 @@ export function doShoot(state, playerIdx, chargeS, error = 0) {
   if (!canKick(state, playerIdx)) return;
   const p = state.players[playerIdx];
   const gx = goalCenterX(state, playerIdx);
-  const gy = CONFIG.PITCH_H / 2;
+  // Aim for the corner away from the keeper — dead center is where they stand.
+  const keeper = state.players[(1 - p.team) * 4];
+  const mouthTop = (CONFIG.PITCH_H - CONFIG.GOAL_W) / 2;
+  const inset = CONFIG.BALL_RADIUS * 2 + 14;
+  const gy = keeper.y >= CONFIG.PITCH_H / 2
+    ? mouthTop + inset
+    : mouthTop + CONFIG.GOAL_W - inset;
 
   let aim = normalize(gx - state.ball.x, gy - state.ball.y);
   if (aim.len === 0) aim = { x: state.attackDir[p.team], y: 0 };
