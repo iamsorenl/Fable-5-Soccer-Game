@@ -44,6 +44,12 @@ function kickBall(state, playerIdx, vx, vy) {
   ball.vx = vx;
   ball.vy = vy;
   state.lastTouchTeam = state.players[playerIdx].team;
+  // A deliberate kick releases the dribble-carry grip, so the widened carry
+  // radius can't reel a slowing pass or weak shot straight back in.
+  if (state._carry) {
+    state._carry.idx = -1;
+    state._carry.t = 0;
+  }
 }
 
 export function canKick(state, playerIdx) {

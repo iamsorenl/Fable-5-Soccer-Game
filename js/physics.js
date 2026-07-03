@@ -106,8 +106,16 @@ function stepBall(state, dt) {
 }
 
 // Dribble capture + hard ball-player collision. Nearest touching player wins.
-function ballPlayerContact(state) {
+function ballPlayerContact(state, dt) {
   const ball = state.ball;
+  // Carry memory: a recent carrier keeps grip over a wider radius for a short
+  // window, so the ball's momentum through a sharp turn can't outrun the
+  // dribble range before the spring reels it back. Only the RANGE widens —
+  // the speed threshold is untouched, so passes and shots still escape.
+  if (!state._carry) state._carry = { idx: -1, t: 0 };
+  const carry = state._carry;
+  carry.t = Math.max(0, carry.t - dt);
+  if (carry.t === 0) carry.idx = -1;
   let nearest = null;
   let nearestIdx = -1;
   let nearestDist = Infinity;
@@ -142,9 +150,14 @@ function ballPlayerContact(state) {
     }
   }
 
+  const captureRange =
+    carry.idx === nearestIdx && carry.t > 0
+      ? CONFIG.DRIBBLE_RANGE + 24
+      : CONFIG.DRIBBLE_RANGE;
+
   if (
     !contested &&
-    nearestDist < CONFIG.DRIBBLE_RANGE &&
+    nearestDist < captureRange &&
     pSpeed > 10 &&
     ballSpeed <= captureMax
   ) {
@@ -156,9 +169,21 @@ function ballPlayerContact(state) {
     // Human-controlled players get a tighter tether so the ball stays at
     // their feet through turns; both values are stable at 60 Hz.
     const gain = state.controlled[p.team] === nearestIdx ? 9 : 6;
-    ball.vx = dirX * pSpeed * CONFIG.DRIBBLE_PUSH + (tx - ball.x) * gain;
-    ball.vy = dirY * pSpeed * CONFIG.DRIBBLE_PUSH + (ty - ball.y) * gain;
+    let bvx = dirX * pSpeed * CONFIG.DRIBBLE_PUSH + (tx - ball.x) * gain;
+    let bvy = dirY * pSpeed * CONFIG.DRIBBLE_PUSH + (ty - ball.y) * gain;
+    // The spring must never launch the ball faster than its own recapture
+    // threshold (captureMax) or one sharp turn breaks the grip for good.
+    const bs = Math.hypot(bvx, bvy);
+    const maxCarry = pSpeed * CONFIG.DRIBBLE_PUSH + 100;
+    if (bs > maxCarry) {
+      bvx *= maxCarry / bs;
+      bvy *= maxCarry / bs;
+    }
+    ball.vx = bvx;
+    ball.vy = bvy;
     state.lastTouchTeam = p.team;
+    carry.idx = nearestIdx;
+    carry.t = 0.3;
     return;
   }
 
@@ -290,7 +315,7 @@ export function stepPhysics(state, dt) {
   stepPlayers(state, dt);
   separatePlayers(state);
   stepBall(state, dt);
-  ballPlayerContact(state);
+  ballPlayerContact(state, dt);
   const events = ballWorldCollisions(state, wasFullyAcross, dt);
 
   clampSpeed(ball, CONFIG.BALL_MAX_SPEED);
