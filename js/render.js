@@ -8,6 +8,16 @@ export function createRenderer(canvas) {
   // remembered facing per player id so the indicator holds while standing still
   const facing = new Map();
 
+  // Player sprites (Kenney Sports Pack, CC0). Sprites face +x; circles are
+  // drawn as a fallback until both images finish loading.
+  const sprites = { team: [new Image(), new Image()], ready: 0 };
+  sprites.team[0].src = 'assets/player-blue.png';
+  sprites.team[1].src = 'assets/player-red.png';
+  for (const img of sprites.team) {
+    img.addEventListener('load', () => { sprites.ready += 1; });
+  }
+  const spritesReady = () => sprites.ready === 2;
+
   // total drawn area includes the recessed goal nets on either side
   const DRAW_W = CONFIG.PITCH_W + CONFIG.GOAL_DEPTH * 2;
   const DRAW_H = CONFIG.PITCH_H;
@@ -100,6 +110,34 @@ export function createRenderer(canvas) {
       ctx.stroke();
     }
 
+    if (spritesReady()) {
+      // soft contact shadow
+      ctx.beginPath();
+      ctx.ellipse(p.x + 2, p.y + 3, p.r * 0.95, p.r * 0.75, 0, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.22)';
+      ctx.fill();
+
+      // keepers keep their white marker as a ground ring under the sprite
+      if (p.isKeeper) {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r + 2, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+
+      const img = sprites.team[p.team];
+      const h = p.r * 2.4; // shoulder span slightly wider than the physics circle
+      const w = h * (img.width / img.height);
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(angle);
+      ctx.drawImage(img, -w / 2, -h / 2, w, h);
+      ctx.restore();
+      return;
+    }
+
+    // Fallback while sprites load: flat circles with a facing notch.
     ctx.beginPath();
     ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
     ctx.fillStyle = p.team === 0 ? C.team0 : C.team1;
@@ -108,7 +146,6 @@ export function createRenderer(canvas) {
     ctx.lineWidth = 2;
     ctx.stroke();
 
-    // facing indicator: a short notch from center toward the facing direction
     ctx.beginPath();
     ctx.moveTo(p.x + Math.cos(angle) * p.r * 0.35, p.y + Math.sin(angle) * p.r * 0.35);
     ctx.lineTo(p.x + Math.cos(angle) * (p.r - 2), p.y + Math.sin(angle) * (p.r - 2));
