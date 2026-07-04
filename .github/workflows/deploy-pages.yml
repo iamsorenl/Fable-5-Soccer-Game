@@ -10,16 +10,18 @@ permissions:
   pages: write
   id-token: write
 
+# Queue runs instead of cancelling: a cancelled/overlapping deployment leaves
+# the Pages API returning "Deployment failed, try again later" for the next one.
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      url: ${{ steps.deployment.outputs.page_url || steps.deployment_retry.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
@@ -27,4 +29,13 @@ jobs:
         with:
           path: .
       - id: deployment
+        uses: actions/deploy-pages@v4
+        continue-on-error: true
+      # The Pages API intermittently rejects with "try again later" — one
+      # spaced retry has always been enough.
+      - name: Wait before retrying flaky deployment
+        if: steps.deployment.outcome == 'failure'
+        run: sleep 45
+      - id: deployment_retry
+        if: steps.deployment.outcome == 'failure'
         uses: actions/deploy-pages@v4
