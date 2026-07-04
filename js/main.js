@@ -118,6 +118,8 @@ function startMatch(mode) {
   state.controlsMode = selectedControls;
   state.goalieMode = selectedGoalie;
   state.aimArrowOn = selectedAimArrow === 'on';
+  state.stamina = [1, 1];
+  state.staminaLock = [false, false];
   mouseSwapConsumed = false;
   switchCycle[0].list = switchCycle[1].list = null;
   switchCycle[0].age = switchCycle[1].age = Infinity;
@@ -238,6 +240,26 @@ function resolveControlled(team, dt) {
   }
 }
 
+// Sprint: hold the sprint key to move faster while the meter drains; an
+// emptied meter locks until it refills part-way. A completed pass refills it.
+function sprintSpeed(team, moving, dt) {
+  const s = state.stamina;
+  const lock = state.staminaLock;
+  if (input.sprintHeld(team) && moving && !lock[team] && s[team] > 0) {
+    s[team] = Math.max(0, s[team] - dt / CONFIG.SPRINT_MAX_S);
+    if (s[team] === 0) lock[team] = true;
+    return CONFIG.PLAYER_SPEED * CONFIG.SPRINT_MULT;
+  }
+  s[team] = Math.min(1, s[team] + dt / CONFIG.SPRINT_REGEN_S);
+  if (lock[team] && s[team] >= CONFIG.SPRINT_UNLOCK_FRAC) lock[team] = false;
+  return CONFIG.PLAYER_SPEED;
+}
+
+function refillStamina(team) {
+  state.stamina[team] = 1;
+  state.staminaLock[team] = false;
+}
+
 // P1 mouse scheme: follow the cursor; LMB hold-charge then release shoots at
 // the cursor; RMB passes toward it; LMB down on a teammate swaps to them.
 function applyMouseInput(team, dt) {
@@ -251,8 +273,9 @@ function applyMouseInput(team, dt) {
   const dx = cur.x - p.x;
   const dy = cur.y - p.y;
   const d = Math.hypot(dx, dy);
+  const speed = sprintSpeed(team, d > 8, dt);
   if (d > 8) {
-    const sp = CONFIG.PLAYER_SPEED * Math.min(1, (d - 8) / 40);
+    const sp = speed * Math.min(1, (d - 8) / 40);
     p.vx = (dx / d) * sp;
     p.vy = (dy / d) * sp;
   } else {
@@ -277,7 +300,7 @@ function applyMouseInput(team, dt) {
   }
 
   if (m.passPressed) {
-    doPass(state, idx, dx, dy);
+    if (doPass(state, idx, dx, dy)) refillStamina(team);
   }
 
   if (m.held && !mouseSwapConsumed) {
@@ -310,14 +333,15 @@ function applyHumanInput(team, dt) {
   if (idx === null || idx === undefined) return;
   const p = state.players[idx];
   const mv = input.getMove(team);
-  p.vx = mv.x * CONFIG.PLAYER_SPEED;
-  p.vy = mv.y * CONFIG.PLAYER_SPEED;
+  const speed = sprintSpeed(team, mv.x !== 0 || mv.y !== 0, dt);
+  p.vx = mv.x * speed;
+  p.vy = mv.y * speed;
 
   // Pass button doubles as switch: with the ball it passes, without it it
   // selects the nearest teammate (re-press cycles).
   if (input.passPressed(team)) {
     if (canKick(state, idx)) {
-      doPass(state, idx, mv.x, mv.y);
+      if (doPass(state, idx, mv.x, mv.y)) refillStamina(team);
     } else {
       manualSwitch(team);
       return;

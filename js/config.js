@@ -15,6 +15,12 @@ export const CONFIG = {
   // Movement
   PLAYER_SPEED: 260,      // units/s for a human-controlled player
 
+  // Sprinting (human-controlled players only)
+  SPRINT_MULT: 1.45,        // speed multiplier while sprinting
+  SPRINT_MAX_S: 2.0,        // seconds of sprint in a full meter
+  SPRINT_REGEN_S: 4.5,      // seconds to refill an empty meter
+  SPRINT_UNLOCK_FRAC: 0.35, // an emptied meter must refill to here before reuse
+
   // Ball
   BALL_FRICTION: 0.38,    // fraction of velocity retained per second (exp decay base)
   BALL_ROLL_DECEL: 45,    // constant rolling resistance (units/s^2) — kills the slow tail

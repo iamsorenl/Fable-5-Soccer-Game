@@ -225,6 +225,18 @@ export function createRenderer(canvas) {
     ctx.fillRect(bx + 1, by + 1, (barW - 2) * frac, barH - 2);
   }
 
+  // Sprint meter under a controlled player; hidden while full.
+  function drawStaminaBar(p, frac, locked) {
+    const barW = 44;
+    const barH = 5;
+    const bx = p.x - barW / 2;
+    const by = p.y + p.r + 10;
+    ctx.fillStyle = CONFIG.COLORS.chargeBarBg;
+    ctx.fillRect(bx, by, barW, barH);
+    ctx.fillStyle = locked ? '#e0452f' : frac < 0.35 ? '#ffb24d' : '#69dd8a';
+    ctx.fillRect(bx + 1, by + 1, (barW - 2) * frac, barH - 2);
+  }
+
   function render(state) {
     // logical origin (pitch top-left) sits GOAL_DEPTH in from the canvas edge
     ctx.setTransform(scale, 0, 0, scale, CONFIG.GOAL_DEPTH * scale, 0);
@@ -241,11 +253,14 @@ export function createRenderer(canvas) {
 
     drawBall(state.ball);
 
-    // shot-charge bar above each charging controlled player
+    // shot-charge bar above each charging controlled player, sprint meter below
     for (let team = 0; team < 2; team++) {
       const idx = state.controlled[team];
       if (idx === null || idx === undefined) continue;
       if (state.charge[team] > 0) drawChargeBar(state.players[idx], state.charge[team]);
+      if (state.stamina && state.stamina[team] < 0.995) {
+        drawStaminaBar(state.players[idx], state.stamina[team], state.staminaLock[team]);
+      }
     }
   }
 

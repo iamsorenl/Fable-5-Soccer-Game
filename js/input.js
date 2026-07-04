@@ -10,12 +10,14 @@ const PASS_KEYS = ['KeyC', 'Comma'];
 const SHOOT_KEYS = ['KeyV', 'Period'];
 const GOALIE_KEYS = ['KeyQ', 'Slash'];
 const SWITCH_KEYS = ['KeyE', 'KeyM'];
+const SPRINT_KEYS = ['Space', 'ShiftRight'];
 
-// Keys whose default behavior (scrolling) must be suppressed. Space is not a
-// game control and must stay usable to activate focused menu buttons.
+// Keys whose default behavior (scrolling, button activation, quick-find)
+// must be suppressed while they double as game controls.
 const PREVENT_DEFAULT = new Set([
   'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
   'Slash', // Firefox quick-find
+  'Space', // sprint — must not scroll or re-activate a focused button
 ]);
 
 // mouseTarget (usually the game canvas) scopes button presses so clicks on
@@ -129,6 +131,10 @@ export function createInput(target = window, mouseTarget = null) {
 
     shootHeld(slot) {
       return held.has(SHOOT_KEYS[slot]);
+    },
+
+    sprintHeld(slot) {
+      return held.has(SPRINT_KEYS[slot]);
     },
 
     shootReleased(slot) {
