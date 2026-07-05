@@ -1,5 +1,5 @@
 // Canvas renderer: gameplay visuals only (menus/HUD/banners live in the DOM).
-import { CONFIG } from './config.js';
+import { CONFIG, keeperBox } from './config.js';
 
 export function createRenderer(canvas) {
   const ctx = canvas.getContext('2d');
@@ -73,11 +73,14 @@ export function createRenderer(canvas) {
     ctx.fillStyle = C.lines;
     ctx.fill();
 
-    // goal boxes
-    const boxW = 140;
-    const boxH = GOAL_W + 140;
-    ctx.strokeRect(0, (H - boxH) / 2, boxW, boxH);
-    ctx.strokeRect(W - boxW, (H - boxH) / 2, boxW, boxH);
+    // keeper boxes: outer (retreat) + inner (protected) at both ends
+    const { GOAL_AREA_W: iw, GOAL_AREA_H: ih, PENALTY_AREA_W: ow, PENALTY_AREA_H: oh } = CONFIG;
+    for (const nearLine of [0, W]) {
+      const oX = nearLine === 0 ? 0 : W - ow;
+      const iX = nearLine === 0 ? 0 : W - iw;
+      ctx.strokeRect(oX, (H - oh) / 2, ow, oh);
+      ctx.strokeRect(iX, (H - ih) / 2, iw, ih);
+    }
 
     // goal mouths: openings drawn as recessed nets behind each goal line
     const gTop = (H - GOAL_W) / 2;
@@ -250,12 +253,27 @@ export function createRenderer(canvas) {
     ctx.fillRect(bx + 1, by + 1, (barW - 2) * frac, barH - 2);
   }
 
+  // Highlight the active protected box: faint fill of the outer (retreat) box
+  // plus a warm outline of the inner (no-go) box.
+  function drawKeeperProtect(state) {
+    const t = state.keeperProtect;
+    if (t == null) return;
+    const inner = keeperBox(state, t, 'inner');
+    const outer = keeperBox(state, t, 'outer');
+    ctx.fillStyle = 'rgba(255, 210, 90, 0.10)';
+    ctx.fillRect(outer.x0, outer.y0, outer.x1 - outer.x0, outer.y1 - outer.y0);
+    ctx.strokeStyle = 'rgba(255, 210, 90, 0.8)';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(inner.x0, inner.y0, inner.x1 - inner.x0, inner.y1 - inner.y0);
+  }
+
   function render(state) {
     // logical origin (pitch top-left) sits GOAL_DEPTH in from the canvas edge
     ctx.setTransform(scale, 0, 0, scale, CONFIG.GOAL_DEPTH * scale, 0);
     ctx.clearRect(-CONFIG.GOAL_DEPTH, 0, DRAW_W, DRAW_H);
     drawPitch();
 
+    if (state.keeperProtect != null) drawKeeperProtect(state);
     if (state.aimArrow) drawAimArrow(state.aimArrow);
     if (state.stealFx) drawStealFx(state.stealFx);
 

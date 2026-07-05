@@ -8,6 +8,14 @@ export const CONFIG = {
   GOAL_W: 180,            // goal mouth height (opening in left/right walls)
   GOAL_DEPTH: 40,         // visual depth of the goal behind the line
 
+  // Keeper boxes (both goal ends). Inner = protected zone: while the keeper
+  // holds the ball inside it, opponents can't enter or touch the ball. Outer
+  // = the line opponents must retreat behind during that protection.
+  GOAL_AREA_W: 96,        // inner (protected) box: width from the goal line
+  GOAL_AREA_H: 250,       // inner box height (a bit taller than the mouth)
+  PENALTY_AREA_W: 196,    // outer box: width from the goal line
+  PENALTY_AREA_H: 380,    // outer box height
+
   // Entity sizes
   PLAYER_RADIUS: 16,
   BALL_RADIUS: 9,
@@ -65,6 +73,7 @@ export const CONFIG = {
   KEEPER_RANGE_X: 130,        // how far off the line a keeper will come to smother
   KEEPER_SMOTHER_RANGE: 90,   // loose-ball distance that triggers coming out
   KEEPER_CLEAR_DELAY_S: 0.4,  // pause holding the ball before clearing
+  KEEPER_PROTECT_HOLD_S: 1.5, // hold before distributing under box protection
 
   COLORS: {
     pitch: '#2e8b3d',
@@ -88,3 +97,21 @@ export const CONFIG = {
     hard:   { aiSpeedMult: 1.00, reactionDelayS: 0.10, shotError: 0.07, passError: 0.05, keeperLagS: 0.10, pressStandoff: 0, stealCooldownS: 1.1 },
   },
 };
+
+// Rect for a team's inner (protected) or outer (retreat) keeper box, placed
+// against that team's own goal line per its current attack direction.
+export function keeperBox(state, team, which) {
+  const dir = state.attackDir[team];
+  const w = which === 'inner' ? CONFIG.GOAL_AREA_W : CONFIG.PENALTY_AREA_W;
+  const h = which === 'inner' ? CONFIG.GOAL_AREA_H : CONFIG.PENALTY_AREA_H;
+  const y0 = (CONFIG.PITCH_H - h) / 2;
+  const x0 = dir === 1 ? 0 : CONFIG.PITCH_W - w; // own goal on the -dir side
+  return { x0, x1: x0 + w, y0, y1: y0 + h };
+}
+
+export function pointInBox(x, y, box, margin = 0) {
+  return (
+    x >= box.x0 - margin && x <= box.x1 + margin &&
+    y >= box.y0 - margin && y <= box.y1 + margin
+  );
+}

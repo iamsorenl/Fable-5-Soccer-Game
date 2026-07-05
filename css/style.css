@@ -170,7 +170,8 @@ body {
 .btn-switch,
 .btn-controls,
 .btn-goalie,
-.btn-arrow {
+.btn-arrow,
+.btn-keeperbox {
   font-size: 15px;
   padding: 7px 18px;
 }
@@ -179,7 +180,8 @@ body {
 .btn-switch.selected,
 .btn-controls.selected,
 .btn-goalie.selected,
-.btn-arrow.selected {
+.btn-arrow.selected,
+.btn-keeperbox.selected {
   background: #2f6fe0;
   border-color: #6ea0ff;
 }

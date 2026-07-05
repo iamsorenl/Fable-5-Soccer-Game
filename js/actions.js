@@ -1,6 +1,6 @@
 // Shared ball-action helpers used by human input (main.js) and ai.js.
 
-import { CONFIG } from './config.js';
+import { CONFIG, keeperBox, pointInBox } from './config.js';
 
 function dist(ax, ay, bx, by) {
   return Math.hypot(bx - ax, by - ay);
@@ -50,6 +50,23 @@ function kickBall(state, playerIdx, vx, vy) {
     state._carry.idx = -1;
     state._carry.t = 0;
   }
+}
+
+// Which team (if any) currently has protected keeper possession: their keeper
+// is holding the ball inside its own inner box. Null if neither.
+export function computeKeeperProtect(state) {
+  for (const team of [0, 1]) {
+    const keeper = state.players[team * 4];
+    const box = keeperBox(state, team, 'inner');
+    if (
+      dist(keeper.x, keeper.y, state.ball.x, state.ball.y) <= CONFIG.KICK_RANGE &&
+      pointInBox(keeper.x, keeper.y, box) &&
+      pointInBox(state.ball.x, state.ball.y, box, CONFIG.BALL_RADIUS)
+    ) {
+      return team;
+    }
+  }
+  return null;
 }
 
 export function canKick(state, playerIdx) {

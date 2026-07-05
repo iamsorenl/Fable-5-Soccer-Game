@@ -3,7 +3,7 @@
 import { CONFIG } from './config.js';
 import { createMatchState, setupKickoff, applyHalftime } from './entities.js';
 import { stepPhysics } from './physics.js';
-import { attemptSteal, canKick, doPass, doShoot } from './actions.js';
+import { attemptSteal, canKick, computeKeeperProtect, doPass, doShoot } from './actions.js';
 import { updateAI } from './ai.js';
 import { createInput } from './input.js';
 import { createRenderer } from './render.js';
@@ -27,6 +27,7 @@ const dom = {
   controlsmode: $('controlsmode'),
   goaliemode: $('goaliemode'),
   aimarrow: $('aimarrow'),
+  keeperbox: $('keeperbox'),
   legend: $('controls-legend'),
   legendPause: $('legend-pause'),
   legendP1Keys: $('legend-p1-keys'),
@@ -43,6 +44,7 @@ let selectedSwitchMode = 'auto'; // 'auto' = nearest-to-ball | 'stay' = follow p
 let selectedControls = 'keys';   // P1: 'keys' | 'mouse'
 let selectedGoalie = 'swap';     // 'swap' = goalie key/click works | 'ai' = keeper always AI
 let selectedAimArrow = 'on';     // aim arrow in mouse mode
+let selectedKeeperBox = 'on';    // protected keeper possession in the inner box
 let pendingKickoffTeam = 0; // conceding team, restarts play after a goal
 let mouseSwapConsumed = false; // this LMB press was a teammate swap, not a shot
 
@@ -91,6 +93,9 @@ wireToggleRow(dom.goaliemode, '.btn-goalie', (btn) => {
 wireToggleRow(dom.aimarrow, '.btn-arrow', (btn) => {
   selectedAimArrow = btn.dataset.arrow;
 });
+wireToggleRow(dom.keeperbox, '.btn-keeperbox', (btn) => {
+  selectedKeeperBox = btn.dataset.keeperbox;
+});
 
 function togglePause() {
   if (state && state.phase !== 'fulltime') paused = !paused;
@@ -118,6 +123,8 @@ function startMatch(mode) {
   state.controlsMode = selectedControls;
   state.goalieMode = selectedGoalie;
   state.aimArrowOn = selectedAimArrow === 'on';
+  state.keeperBoxOn = selectedKeeperBox === 'on';
+  state.keeperProtect = null;
   state.stamina = [1, 1];
   state.staminaLock = [false, false];
   state.stealCooldown = [0, 0];
@@ -402,6 +409,7 @@ function tick(dt) {
   }
 
   state.aimArrow = null; // re-set each tick by mouse input while playing
+  if (state.phase !== 'playing') state.keeperProtect = null;
   for (const t of [0, 1]) {
     state.stealCooldown[t] = Math.max(0, state.stealCooldown[t] - dt);
   }
@@ -459,6 +467,7 @@ function tick(dt) {
       applyHumanInput(1, dt);
       updateAI(state, dt);
       const events = stepPhysics(state, dt);
+      state.keeperProtect = state.keeperBoxOn ? computeKeeperProtect(state) : null;
 
       for (const ev of events) {
         if (ev.type === 'goal') {

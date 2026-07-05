@@ -1,7 +1,7 @@
 // Physics: integration, ball-wall/goal handling, player separation, dribbling.
 // stepPhysics mutates state and returns an array of events (currently only goals).
 
-import { CONFIG } from './config.js';
+import { CONFIG, keeperBox, pointInBox } from './config.js';
 
 const EPS = 1e-6;
 
@@ -105,9 +105,42 @@ function stepBall(state, dt) {
   ball.y += ball.vy * dt;
 }
 
+// While a team has protected keeper possession, opponents are walled out of
+// that team's inner box (pushed out through the nearest open face — the goal
+// line itself is a wall).
+function ejectOpponentsFromInnerBox(state) {
+  const t = state.keeperProtect;
+  if (t == null) return;
+  const box = keeperBox(state, t, 'inner');
+  const dir = state.attackDir[t];
+  for (const p of state.players) {
+    if (p.team === t) continue;
+    const r = p.r;
+    const x0 = box.x0 - r;
+    const x1 = box.x1 + r;
+    const y0 = box.y0 - r;
+    const y1 = box.y1 + r;
+    if (p.x <= x0 || p.x >= x1 || p.y <= y0 || p.y >= y1) continue;
+    const openXTarget = dir === 1 ? x1 : x0; // the non-goal-line x face
+    const openXPush = Math.abs(p.x - openXTarget);
+    const topPush = p.y - y0;
+    const botPush = y1 - p.y;
+    const m = Math.min(openXPush, topPush, botPush);
+    if (m === openXPush) p.x = openXTarget;
+    else if (m === topPush) p.y = y0;
+    else p.y = y1;
+  }
+}
+
 // Dribble capture + hard ball-player collision. Nearest touching player wins.
 function ballPlayerContact(state, dt) {
   const ball = state.ball;
+  // Under keeper protection, opponents can't touch the ball at all while it's
+  // in the inner box — exclude them from the nearest-player search.
+  const protectTeam = state.keeperProtect;
+  const protectActive =
+    protectTeam != null &&
+    pointInBox(ball.x, ball.y, keeperBox(state, protectTeam, 'inner'), CONFIG.BALL_RADIUS);
   // Carry memory: a recent carrier keeps grip over a wider radius for a short
   // window, so the ball's momentum through a sharp turn can't outrun the
   // dribble range before the spring reels it back. Only the RANGE widens —
@@ -121,6 +154,7 @@ function ballPlayerContact(state, dt) {
   let nearestDist = Infinity;
   for (let i = 0; i < state.players.length; i++) {
     const q = state.players[i];
+    if (protectActive && q.team !== protectTeam) continue;
     const d = Math.hypot(ball.x - q.x, ball.y - q.y);
     if (d < nearestDist) {
       nearestDist = d;
@@ -314,6 +348,7 @@ export function stepPhysics(state, dt) {
 
   stepPlayers(state, dt);
   separatePlayers(state);
+  ejectOpponentsFromInnerBox(state);
   stepBall(state, dt);
   ballPlayerContact(state, dt);
   const events = ballWorldCollisions(state, wasFullyAcross, dt);

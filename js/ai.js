@@ -1,7 +1,7 @@
 // AI brains: teammate positioning, opponent team roles, goalkeepers.
 // Controls every player not listed in state.controlled.
 
-import { CONFIG } from './config.js';
+import { CONFIG, keeperBox } from './config.js';
 import { attemptSteal, canKick, findPassTarget, doPass, doShoot, doClear } from './actions.js';
 
 // AI-only tuning (module-local; gameplay-wide constants live in config.js).
@@ -162,12 +162,21 @@ function updateKeeper(state, idx, diff, brain, dt) {
   const speed = CONFIG.KEEPER_SPEED * diff.aiSpeedMult;
 
   if (canKick(state, idx)) {
-    // Smothered the ball: pause briefly, then clear upfield.
+    // Smothered the ball: pause, then distribute. Under box protection the
+    // keeper holds longer and looks for an open teammate (opponents have
+    // backed off) before falling back to a clear.
     brain.keeperHold[idx] += dt;
     p.vx = 0;
     p.vy = 0;
-    if (brain.keeperHold[idx] >= CONFIG.KEEPER_CLEAR_DELAY_S && brain.cooldown[idx] <= 0) {
-      doClear(state, idx);
+    const protectedNow = state.keeperProtect === p.team;
+    const hold = protectedNow ? CONFIG.KEEPER_PROTECT_HOLD_S : CONFIG.KEEPER_CLEAR_DELAY_S;
+    if (brain.keeperHold[idx] >= hold && brain.cooldown[idx] <= 0) {
+      let passed = false;
+      if (protectedNow) {
+        const mate = findPassTarget(state, idx, dir, 0);
+        if (mate != null) passed = doPass(state, idx, dir, 0, diff.passError);
+      }
+      if (!passed) doClear(state, idx);
       brain.keeperHold[idx] = 0;
       brain.cooldown[idx] = KICK_COOLDOWN_S;
     }
@@ -290,7 +299,20 @@ function updateTeam(state, team, brain, dt) {
 
   const assigned = new Set();
 
-  if (perceived === team) {
+  if (state.keeperBoxOn && state.keeperProtect === 1 - team) {
+    // Opponent keeper has protected possession: concede and retreat behind
+    // their outer box; no pressing or steals until the ball is distributed.
+    const dir = state.attackDir[team];
+    const outer = keeperBox(state, 1 - team, 'outer');
+    const edge = dir === 1 ? outer.x0 : outer.x1;
+    const margin = CONFIG.PLAYER_RADIUS + 10;
+    for (const i of outfield) {
+      const p = state.players[i];
+      const a = anchor(state, p, -1);
+      a.x = dir === 1 ? Math.min(a.x, edge - margin) : Math.max(a.x, edge + margin);
+      seek(p, a.x, a.y, speed);
+    }
+  } else if (perceived === team) {
     // We (believe we) have the ball.
     if (carIdx >= 0 && state.players[carIdx].team === team) {
       if (outfield.includes(carIdx)) {
