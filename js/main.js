@@ -38,6 +38,12 @@ const dom = {
   legendP1Keys: $('legend-p1-keys'),
   legendP1Mouse: $('legend-p1-mouse'),
   replayNote: $('replay-note'),
+  pauseActions: $('pause-actions'),
+  btnMenu: $('btn-menu'),
+  guide: $('guide'),
+  btnGuide: $('btn-guide'),
+  btnGuidePause: $('btn-guide-pause'),
+  btnGuideBack: $('btn-guide-back'),
 };
 
 const input = createInput(window, $('game'));
@@ -132,15 +138,25 @@ initLeague({
     startMatch('watch', [cfgA, cfgB], [cfgA.name, cfgB.name], seed, oldEngine, expected),
   onPlay: (cfg, name) => startMatch('single', [null, cfg], [null, name]),
 });
-dom.btnAgain.addEventListener('click', () => {
+function returnToMenu() {
   state = null;
   paused = false;
+  // Reclaim the legend if the pause screen borrowed it; with state null the
+  // overlay sync that normally moves it back no longer runs.
+  dom.menu.insertBefore(dom.legend, dom.legendPause);
   dom.menu.classList.remove('hidden');
   dom.hud.classList.add('hidden');
   dom.banner.classList.add('hidden');
   dom.btnAgain.classList.add('hidden');
   dom.replayNote.classList.add('hidden');
-});
+}
+dom.btnAgain.addEventListener('click', returnToMenu);
+dom.btnMenu.addEventListener('click', returnToMenu);
+
+// Guide overlay: openable from the main menu and the pause screen.
+dom.btnGuide.addEventListener('click', () => dom.guide.classList.remove('hidden'));
+dom.btnGuidePause.addEventListener('click', () => dom.guide.classList.remove('hidden'));
+dom.btnGuideBack.addEventListener('click', () => dom.guide.classList.add('hidden'));
 
 // mode 'watch' renders an AI-vs-AI test match (no human input); teamConfigs
 // [a, b] feed the team tactics/attributes, names label the HUD. seed makes
@@ -526,6 +542,7 @@ function updateOverlays() {
   dom.banner.classList.toggle('hidden', text === null);
   if (text !== null) dom.bannerText.textContent = text;
   dom.btnAgain.classList.toggle('hidden', !showAgain);
+  dom.pauseActions.classList.toggle('hidden', !paused);
   dom.btnPause.textContent = paused ? '▶' : '❚❚';
   dom.btnPause.classList.toggle('hidden', state.phase === 'fulltime');
 

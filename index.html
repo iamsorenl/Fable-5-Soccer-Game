@@ -59,6 +59,7 @@
         <button id="btn-2p" class="btn btn-primary">2 Players</button>
         <button id="btn-builder" class="btn btn-primary">Team Builder</button>
         <button id="btn-league" class="btn btn-primary">AI League</button>
+        <button id="btn-guide" class="btn btn-primary">Guide</button>
       </div>
 
       <div class="controls-legend" id="controls-legend">
@@ -142,6 +143,80 @@
     <div id="banner" class="hidden">
       <div id="banner-text">GOAL!</div>
       <button id="btn-again" class="btn btn-primary hidden">Play Again</button>
+      <div id="pause-actions" class="hidden">
+        <button id="btn-guide-pause" class="btn">Guide</button>
+        <button id="btn-menu" class="btn btn-primary">Return to Menu</button>
+      </div>
+    </div>
+
+    <div id="guide" class="hidden">
+      <div class="guide-body">
+        <h1 class="builder-title">Guide</h1>
+
+        <h2>What is this?</h2>
+        <p>
+          A 4v4 top-down arcade soccer game. You can play it yourself (1 or 2 players on one
+          keyboard), but the heart of it is the <strong>AI League</strong>: everyone's team runs on
+          the exact same game engine — what makes your team yours is the <em>configuration</em> you
+          build in the Team Builder. Tune it, publish it, and climb the Elo leaderboard by beating
+          other people's teams in simulated matches.
+        </p>
+
+        <h2>Playing a match</h2>
+        <p>Controls are listed on the main menu and the pause screen (<span class="key">Esc</span> pauses). The mechanics behind them:</p>
+        <ul>
+          <li><strong>Shooting</strong> — hold the shoot key to charge power; the aim arrow (toggle on the menu) shows the direction while charging.</li>
+          <li><strong>Sprint &amp; stamina</strong> — sprinting drains your stamina bar; completing a pass refills it. Manage it or you'll be jogging when it matters.</li>
+          <li><strong>Stealing</strong> — press shoot while <em>not</em> holding the ball to lunge for a steal from a nearby carrier. Missing puts steals on cooldown for your team.</li>
+          <li><strong>Player switch</strong> — Auto switches you to the player nearest the ball; Stay keeps your player and the pass key cycles teammates.</li>
+          <li><strong>Keeper box</strong> — the small inner box in front of each goal. While a keeper holds the ball inside it, possession is protected: no steals, a moment to pick a clearance.</li>
+          <li><strong>Goalie</strong> — Swappable lets you jump to/from your keeper; Always AI leaves keeping to the machine.</li>
+        </ul>
+
+        <h2>Team Builder</h2>
+        <p>
+          Your team is a config document: a formation, seven tactic dials, and player attributes.
+          The engine is identical for everyone, so matches are decided purely by how you tune it.
+        </p>
+        <ul>
+          <li><strong>Formation</strong> — where your three outfielders anchor (Standard, Attacking, Defensive, Wide). Anchors shift with the ball and push up in possession.</li>
+          <li><strong>Shot range</strong> — how far from goal your AI is willing to shoot. Long range means more shots, worse ones.</li>
+          <li><strong>Press distance</strong> — how close an opponent must be before your carrier feels pressed and looks to move the ball.</li>
+          <li><strong>Possession push</strong> — how far the whole formation pushes upfield when you have the ball (and drops back when you don't).</li>
+          <li><strong>Through-pass gain</strong> — how much further upfield a teammate must be to earn a through ball. Lower = more ambitious passing.</li>
+          <li><strong>Steal cooldown</strong> — how often your defenders attempt steals. Aggressive stealing wins balls and gets beaten.</li>
+          <li><strong>Keeper clear delay / keeper hold</strong> — how long your keeper waits before clearing, and how long they'll hold the ball in the protected box.</li>
+          <li><strong>Attributes</strong> — each of your 4 players gets pace, stamina, power, and control (0–10, 5 is neutral), from a shared <strong>80-point budget</strong>. You can't max everything: a fast team is a weak-shooting team somewhere else.</li>
+        </ul>
+        <p>
+          Test before you publish: <strong>Watch Match</strong> pits your team against a preset
+          (Aggressive, The Wall, Balanced, Default) AI-vs-AI, and <strong>Play Match</strong> lets
+          you take the field against your own creation. Your team saves locally in the browser —
+          no account needed until you publish.
+        </p>
+
+        <h2>AI League</h2>
+        <ul>
+          <li><strong>Publishing</strong> — sign in with an email magic link, pick a username, and publish. Your team immediately plays ~5 placement matches against similarly rated teams.</li>
+          <li><strong>Ratings</strong> — standard Elo, everyone starts at 1000, K=32, zero-sum: what you win, your opponent loses. Beating stronger teams pays more.</li>
+          <li><strong>Challenges</strong> — hit Challenge on any leaderboard row to play them now. Each team is capped at 10 ranked matches per hour.</li>
+          <li><strong>Fair play</strong> — ranked matches are simulated on the server with a server-chosen random seed. Your browser never reports results, so there's nothing to cheat.</li>
+          <li><strong>Replays</strong> — the sim is deterministic: from the stored seed and both configs, your browser re-runs any ranked match move-for-move. Use match history to scout why you lost.</li>
+          <li><strong>Play</strong> — the Play button on any leaderboard row starts an unranked match: you, against their published team.</li>
+          <li><strong>Updating</strong> — re-publishing uploads your latest tuning; old matches keep the config snapshot they were actually played with.</li>
+        </ul>
+
+        <h2>Under the hood</h2>
+        <p>
+          The game is a static site (vanilla JS + Canvas). Accounts, the leaderboard, and ranked
+          simulation run on Supabase; the server runs the same engine code your browser does.
+          Because every match is reproducible from its seed, replays need no video and the
+          leaderboard needs no trust in players. Inspired by Berkeley Pac-Man capture tournaments —
+          same agents, different weights, may the best config win.
+        </p>
+
+        <button id="btn-guide-back" class="btn">Back</button>
+      </div>
     </div>
   </div>
 
