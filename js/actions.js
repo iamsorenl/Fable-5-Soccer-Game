@@ -35,6 +35,10 @@ function nearestOpponentDist(state, x, y, team) {
 
 function kickBall(state, playerIdx, vx, vy) {
   const ball = state.ball;
+  // Power attribute scales every deliberate kick (pass/shot/clear).
+  const power = state.players[playerIdx].kickMult || 1;
+  vx *= power;
+  vy *= power;
   const speed = Math.hypot(vx, vy);
   if (speed > CONFIG.BALL_MAX_SPEED) {
     const k = CONFIG.BALL_MAX_SPEED / speed;
@@ -112,6 +116,7 @@ export function findPassTarget(state, playerIdx, dirX, dirY) {
 
 export function doPass(state, playerIdx, dirX, dirY, error = 0) {
   if (!canKick(state, playerIdx)) return false;
+  error *= state.players[playerIdx].errMult || 1; // control attribute
   const targetIdx = findPassTarget(state, playerIdx, dirX, dirY);
   if (targetIdx === null) return false;
 
@@ -134,6 +139,7 @@ export function doPass(state, playerIdx, dirX, dirY, error = 0) {
 export function doShoot(state, playerIdx, chargeS, error = 0, aimX = null, aimY = null) {
   if (!canKick(state, playerIdx)) return;
   const p = state.players[playerIdx];
+  error *= p.errMult || 1; // control attribute
 
   let aim;
   if (aimX !== null && aimY !== null) {

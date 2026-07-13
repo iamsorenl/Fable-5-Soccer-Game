@@ -3,16 +3,20 @@
 
 import { CONFIG } from './config.js';
 import { createMatchState, setupKickoff } from './entities.js';
-import { step } from './engine.js';
+import { createMatch, step } from './engine.js';
+import { playerSpeedMult } from './ai.js';
 import { attemptSteal, canKick, doPass, doShoot } from './actions.js';
 import { createInput } from './input.js';
 import { createRenderer } from './render.js';
+import { initBuilder } from './builder.js';
 
 const $ = (id) => document.getElementById(id);
 
 const dom = {
   menu: $('menu'),
   hud: $('hud'),
+  hudTeam0: $('hud-team0'),
+  hudTeam1: $('hud-team1'),
   hudScore: $('hud-score'),
   hudClock: $('hud-clock'),
   hudHalf: $('hud-half'),
@@ -107,6 +111,13 @@ dom.btnPause.addEventListener('click', () => {
 
 dom.btn1p.addEventListener('click', () => startMatch('single'));
 dom.btn2p.addEventListener('click', () => startMatch('two'));
+
+// Team builder: watch = user's team vs a chosen opponent, AI vs AI; play =
+// human (blue, default team) vs the chosen opponent config.
+initBuilder({
+  onWatch: (mine, opp) => startMatch('watch', [mine, opp], [mine.name, opp.name]),
+  onPlay: (opp) => startMatch('single', [null, opp], [null, opp.name]),
+});
 dom.btnAgain.addEventListener('click', () => {
   state = null;
   paused = false;
@@ -116,8 +127,17 @@ dom.btnAgain.addEventListener('click', () => {
   dom.btnAgain.classList.add('hidden');
 });
 
-function startMatch(mode) {
-  state = createMatchState({ mode, difficulty: selectedDifficulty });
+// mode 'watch' renders an AI-vs-AI test match (no human input); teamConfigs
+// [a, b] feed the team tactics/attributes, names label the HUD.
+function startMatch(mode, teamConfigs = null, names = null) {
+  if (mode === 'watch') {
+    state = createMatch(teamConfigs[0], teamConfigs[1]);
+  } else {
+    state = createMatchState({ mode, difficulty: selectedDifficulty });
+    if (teamConfigs) state.teamConfig = teamConfigs;
+  }
+  dom.hudTeam0.textContent = ((names && names[0]) || 'Blue').toUpperCase();
+  dom.hudTeam1.textContent = ((names && names[1]) || 'Red').toUpperCase();
   state.switchMode = selectedSwitchMode;
   state.controlsMode = selectedControls;
   state.goalieMode = selectedGoalie;
@@ -297,7 +317,7 @@ function applyMouseInput(team, dt) {
   const dx = cur.x - p.x;
   const dy = cur.y - p.y;
   const d = Math.hypot(dx, dy);
-  const speed = sprintSpeed(team, d > 8, dt);
+  const speed = sprintSpeed(team, d > 8, dt) * playerSpeedMult(state, p);
   if (d > 8) {
     const sp = speed * Math.min(1, (d - 8) / 40);
     p.vx = (dx / d) * sp;
@@ -359,7 +379,7 @@ function applyHumanInput(team, dt) {
   if (idx === null || idx === undefined) return;
   const p = state.players[idx];
   const mv = input.getMove(team);
-  const speed = sprintSpeed(team, mv.x !== 0 || mv.y !== 0, dt);
+  const speed = sprintSpeed(team, mv.x !== 0 || mv.y !== 0, dt) * playerSpeedMult(state, p);
   p.vx = mv.x * speed;
   p.vy = mv.y * speed;
 

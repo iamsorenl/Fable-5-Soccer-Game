@@ -237,6 +237,160 @@ body {
   opacity: 0.75;
 }
 
+/* ---------- Team builder ---------- */
+
+#builder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  background: #0d1115;
+  overflow-y: auto;
+}
+
+.builder-title {
+  font-size: clamp(26px, 4vw, 42px);
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.builder-cols {
+  display: flex;
+  gap: 48px;
+  align-items: flex-start;
+}
+
+.builder-col {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 360px;
+}
+
+.builder-name,
+.builder-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.builder-name input {
+  font: inherit;
+  font-weight: 700;
+  color: #eef2f5;
+  background: #22282e;
+  border: 2px solid #454f58;
+  border-radius: 8px;
+  padding: 6px 10px;
+  flex: 1;
+}
+
+.slider-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+}
+
+.slider-name {
+  width: 150px;
+  text-align: right;
+  opacity: 0.8;
+  text-transform: capitalize;
+}
+
+.slider-row input[type='range'] {
+  flex: 1;
+  min-width: 90px;
+  accent-color: #2f6fe0;
+}
+
+.slider-val {
+  width: 40px;
+  text-align: left;
+  font-variant-numeric: tabular-nums;
+}
+
+.btn-formation {
+  font-size: 14px;
+  padding: 6px 14px;
+  margin-right: 6px;
+}
+
+.btn-formation.selected {
+  background: #2f6fe0;
+  border-color: #6ea0ff;
+}
+
+#budget {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.budget-bar {
+  flex: 1;
+  height: 8px;
+  background: #22282e;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+#budget-fill {
+  height: 100%;
+  background: #69dd8a;
+}
+
+#attrs {
+  display: flex;
+  gap: 20px;
+}
+
+.attr-col {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.attr-col .slider-name {
+  width: 58px;
+  font-size: 12px;
+}
+
+.attr-col .slider-val {
+  width: 18px;
+}
+
+.attr-pos {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #6ea0ff;
+}
+
+.builder-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+#opponent {
+  font: inherit;
+  font-weight: 700;
+  color: #eef2f5;
+  background: #2a3138;
+  border: 2px solid #454f58;
+  border-radius: 10px;
+  padding: 8px 12px;
+}
+
 /* ---------- Banner ---------- */
 
 #banner {

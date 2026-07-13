@@ -57,6 +57,7 @@
         </div>
         <button id="btn-1p" class="btn btn-primary">1 Player</button>
         <button id="btn-2p" class="btn btn-primary">2 Players</button>
+        <button id="btn-builder" class="btn btn-primary">Team Builder</button>
       </div>
 
       <div class="controls-legend" id="controls-legend">
@@ -89,6 +90,37 @@
         </div>
       </div>
       <p class="legend-pause" id="legend-pause"><span class="key">Esc</span> Pause</p>
+    </div>
+
+    <div id="builder" class="hidden">
+      <h1 class="builder-title">Team Builder</h1>
+      <div class="builder-cols">
+        <div class="builder-col">
+          <label class="builder-name">
+            <span class="difficulty-label">Name</span>
+            <input id="team-name" maxlength="24">
+          </label>
+          <div class="builder-row">
+            <span class="difficulty-label">Formation</span>
+            <span id="formation-row"></span>
+          </div>
+          <div id="tactics"></div>
+        </div>
+        <div class="builder-col">
+          <div id="budget">
+            <span id="budget-text"></span>
+            <div class="budget-bar"><div id="budget-fill"></div></div>
+          </div>
+          <div id="attrs"></div>
+        </div>
+      </div>
+      <div class="builder-actions">
+        <span class="difficulty-label">Opponent</span>
+        <select id="opponent"></select>
+        <button id="btn-watch" class="btn btn-primary">Watch Match</button>
+        <button id="btn-playteam" class="btn btn-primary">Play Match</button>
+        <button id="btn-builder-back" class="btn">Back</button>
+      </div>
     </div>
 
     <div id="banner" class="hidden">

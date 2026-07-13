@@ -27,6 +27,13 @@ export const DEFAULT_TEAM_CONFIG = {
     { xFrac: 0.46, yFrac: 0.28 }, // upper mid
     { xFrac: 0.46, yFrac: 0.72 }, // lower mid / striker
   ],
+  // Attribute splits per index-within-team (0 = keeper); 5 = neutral.
+  players: [
+    { pace: 5, stamina: 5, power: 5, control: 5 },
+    { pace: 5, stamina: 5, power: 5, control: 5 },
+    { pace: 5, stamina: 5, power: 5, control: 5 },
+    { pace: 5, stamina: 5, power: 5, control: 5 },
+  ],
 };
 
 // Merged tunables for a team, resolved once per match.
@@ -35,8 +42,29 @@ function tuning(state, team) {
     state._tune = [0, 1].map((t) =>
       Object.assign({}, DEFAULT_TEAM_CONFIG, state.teamConfig && state.teamConfig[t])
     );
+    // Resolve attribute splits into per-player multipliers once (5 = 1.0).
+    const mult = (v) => 0.85 + 0.03 * clamp(v == null ? 5 : v, 0, 10);
+    for (const t of [0, 1]) {
+      const attrs = state._tune[t].players || [];
+      for (let s = 0; s < 4; s++) {
+        const p = state.players[t * 4 + s];
+        const a = attrs[s] || {};
+        p.paceMult = mult(a.pace);       // movement speed
+        p.stamMult = mult(a.stamina);    // late-match speed drift (playerSpeedMult)
+        p.kickMult = mult(a.power);      // pass/shot/clear speed (actions.kickBall)
+        p.errMult = 2 - mult(a.control); // AI kick error scale (lower = tighter)
+      }
+    }
   }
   return state._tune[team];
+}
+
+// Movement-speed multiplier from attributes: pace all match long, plus the
+// speed drifting toward the stamina multiplier as the clock runs down — fit
+// teams (stamina > 5) finish faster, unfit ones fade.
+export function playerSpeedMult(state, p) {
+  const frac = Math.min(1, state.clockS / (2 * CONFIG.HALF_LENGTH_S));
+  return (p.paceMult || 1) * (1 + ((p.stamMult || 1) - 1) * frac);
 }
 
 function dist(ax, ay, bx, by) {
@@ -159,7 +187,7 @@ function driftToFormation(state, p, speedMult) {
   const home = p.isKeeper
     ? keeperHome(state, p)
     : anchor(state, p, 0);
-  seek(p, home.x, home.y, CONFIG.PLAYER_SPEED * 0.9 * speedMult);
+  seek(p, home.x, home.y, CONFIG.PLAYER_SPEED * 0.9 * speedMult * playerSpeedMult(state, p));
 }
 
 function keeperHome(state, p) {
@@ -176,7 +204,7 @@ function updateKeeper(state, idx, diff, brain, dt) {
   const lineX = ownGoalX + dir * CONFIG.KEEPER_LINE_OFFSET;
   const goalTop = (CONFIG.PITCH_H - CONFIG.GOAL_W) / 2;
   const goalBot = goalTop + CONFIG.GOAL_W;
-  const speed = CONFIG.KEEPER_SPEED * diff.aiSpeedMult;
+  const speed = CONFIG.KEEPER_SPEED * diff.aiSpeedMult * playerSpeedMult(state, p);
 
   if (canKick(state, idx)) {
     // Smothered the ball: pause, then distribute. Under box protection the
@@ -266,7 +294,7 @@ function updateCarrier(state, idx, diff, brain, dt) {
   // Collect the ball before turning upfield — "in kick range" is wider than
   // dribble contact, and walking goalward without the ball causes a limit
   // cycle straddling the range boundary (visible as full-speed vibration).
-  const sp = CONFIG.PLAYER_SPEED * diff.aiSpeedMult;
+  const sp = CONFIG.PLAYER_SPEED * diff.aiSpeedMult * playerSpeedMult(state, p);
   const dBall = dist(p.x, p.y, state.ball.x, state.ball.y);
   if (dBall > CONFIG.DRIBBLE_RANGE * 0.75) {
     seek(p, state.ball.x, state.ball.y, sp);
@@ -300,6 +328,8 @@ function coverLanePoint(state, team, carrierIdx) {
 function updateTeam(state, team, brain, dt) {
   const diff = difficultyFor(state, team);
   const speed = CONFIG.PLAYER_SPEED * diff.aiSpeedMult;
+  // Pace/stamina attributes scale the team's base AI speed per player.
+  const spd = (p) => speed * playerSpeedMult(state, p);
   const perceived = brain.perceived[team];
   const carIdx = carrierIndex(state);
   const humanIdx = state.controlled[team];
@@ -329,7 +359,7 @@ function updateTeam(state, team, brain, dt) {
       const p = state.players[i];
       const a = anchor(state, p, -1);
       a.x = dir === 1 ? Math.min(a.x, edge - margin) : Math.max(a.x, edge + margin);
-      seek(p, a.x, a.y, speed);
+      seek(p, a.x, a.y, spd(p));
     }
   } else if (perceived === team) {
     // We (believe we) have the ball.
@@ -348,7 +378,7 @@ function updateTeam(state, team, brain, dt) {
         dist(state.players[humanIdx].x, state.players[humanIdx].y, state.ball.x, state.ball.y) <
           dist(cp.x, cp.y, state.ball.x, state.ball.y);
       if (!humanCloser) {
-        seek(cp, state.ball.x, state.ball.y, speed);
+        seek(cp, state.ball.x, state.ball.y, spd(cp));
         assigned.add(chaser);
       }
     }
@@ -363,7 +393,7 @@ function updateTeam(state, team, brain, dt) {
         a.x = clamp(a.x + (p.x - opp.x) * k, p.r, CONFIG.PITCH_W - p.r);
         a.y = clamp(a.y + (p.y - opp.y) * k, p.r, CONFIG.PITCH_H - p.r);
       }
-      seek(p, a.x, a.y, speed);
+      seek(p, a.x, a.y, spd(p));
     }
   } else {
     // Defending (perceived opponent ball) or loose ball.
@@ -394,7 +424,7 @@ function updateTeam(state, team, brain, dt) {
             ty += (dy / dd) * diff.pressStandoff;
           }
         }
-        seek(pp, tx, ty, speed);
+        seek(pp, tx, ty, spd(pp));
         assigned.add(presser);
         // In lunge range of an opposing carrier: try the same steal move
         // humans have, at a difficulty-scaled rate.
@@ -419,7 +449,7 @@ function updateTeam(state, team, brain, dt) {
         const cover = outfield.find((i) => !assigned.has(i));
         if (cover != null) {
           const cpnt = coverLanePoint(state, team, carIdx);
-          seek(state.players[cover], cpnt.x, cpnt.y, speed);
+          seek(state.players[cover], cpnt.x, cpnt.y, spd(state.players[cover]));
           assigned.add(cover);
         }
       }
@@ -428,7 +458,7 @@ function updateTeam(state, team, brain, dt) {
       if (assigned.has(i)) continue;
       const p = state.players[i];
       const a = anchor(state, p, posture);
-      seek(p, a.x, a.y, speed);
+      seek(p, a.x, a.y, spd(p));
     }
   }
 
